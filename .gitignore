@@ -1,0 +1,19 @@
+# Python build artifacts
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+
+# Environment
+.env
+.venv/
+env/
+venv/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
