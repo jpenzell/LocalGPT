@@ -1,0 +1,4 @@
+gradio
+ollama
+python-docx
+PyPDF2
