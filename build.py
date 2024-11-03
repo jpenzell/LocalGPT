@@ -15,7 +15,7 @@ try:
     for file in files_to_copy:
         shutil.copy(file, 'LocalGPT-Installer/')
     
-    # Create the launcher script with model installation
+    # Create the launcher script with all models
     launcher_path = os.path.join('LocalGPT-Installer', 'Launch LocalGPT.command')
     with open(launcher_path, 'w') as f:
         f.write('''#!/bin/bash
@@ -72,11 +72,16 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
-# Check and pull Mistral model if not present
-if ! ollama list | grep -q "mistral"; then
-    echo "Downloading Mistral model (this may take a few minutes)..."
-    ollama pull mistral
-fi
+# Function to check and pull models
+check_and_pull_model() {
+    local model=$1
+    if ! ollama list | grep -q "$model"; then
+        echo "Downloading $model model (this may take a few minutes)..."
+        ollama pull $model
+    else
+        echo "$model model already installed"
+    fi
+}
 
 # Start Ollama service if not running
 if ! pgrep -x "ollama" > /dev/null; then
@@ -85,6 +90,16 @@ if ! pgrep -x "ollama" > /dev/null; then
     # Give it a moment to start
     sleep 5
 fi
+
+# Install all required models
+echo "Checking and installing required models..."
+check_and_pull_model "mistral"
+check_and_pull_model "llama2"
+check_and_pull_model "codellama"
+check_and_pull_model "neural-chat"
+check_and_pull_model "starling-lm"
+check_and_pull_model "dolphin-phi"
+check_and_pull_model "phi"
 
 # Activate virtual environment
 source venv/bin/activate
