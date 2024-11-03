@@ -1,19 +1,19 @@
-# Python build artifacts
-__pycache__/
-*.pyc
-build/
+cat > .gitignore << EOL
+# Build outputs
+LocalGPT-Mac.zip
+LocalGPT-Installer/
 dist/
+build/
 *.spec
 
-# Environment
-.env
-.venv/
-env/
+# Python
+__pycache__/
 venv/
-
-# IDE files
-.vscode/
-.idea/
+*.pyc
 
 # OS files
 .DS_Store
+
+# Local files
+projects.json
+EOL
