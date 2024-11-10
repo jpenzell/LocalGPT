@@ -15,106 +15,158 @@ try:
     for file in files_to_copy:
         shutil.copy(file, 'LocalGPT-Installer/')
     
-    # Create the launcher script with all models
+    # Create the launcher script with dynamic model loading
     launcher_path = os.path.join('LocalGPT-Installer', 'Launch LocalGPT.command')
     with open(launcher_path, 'w') as f:
         f.write('''#!/bin/bash
 
-# Get the directory where this script is located
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR"
+# Function to fetch latest models from Ollama
+fetch_latest_models() {
+    echo "Fetching available models from Ollama..."
+    # Get list of all available models from Ollama
+    available_models=$(curl -s https://ollama.ai/library)
+    
+    # Update our models.json with new information
+    python3 -c '
+import json
+import sys
+import requests
 
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+def update_models_file():
+    try:
+        # Load current models file
+        with open("models.json", "r") as f:
+            current_models = json.load(f)
+        
+        # Fetch latest models from Ollama API
+        response = requests.get("https://ollama.ai/api/tags")
+        latest_models = response.json()
+        
+        # Update existing models with latest info
+        for category in current_models:
+            for model_name in current_models[category]:
+                if model_name in latest_models:
+                    current_models[category][model_name]["size"] = latest_models[model_name]["size"]
+                    current_models[category][model_name]["last_updated"] = latest_models[model_name]["updated"]
+        
+        # Add new models to "new" category
+        current_models.setdefault("new", {})
+        for model_name, info in latest_models.items():
+            found = False
+            for category in current_models:
+                if model_name in current_models[category]:
+                    found = True
+                    break
+            if not found:
+                current_models["new"][model_name] = {
+                    "size": info["size"],
+                    "description": "New model from Ollama",
+                    "priority": 5,
+                    "last_updated": info["updated"]
+                }
+        
+        # Save updated models file
+        with open("models.json", "w") as f:
+            json.dump(current_models, f, indent=4)
+            
+        return "Models updated successfully!"
+    except Exception as e:
+        return f"Error updating models: {str(e)}"
+
+print(update_models_file())
+'
 }
 
-# Check for Xcode Command Line Tools
-if ! command_exists xcode-select; then
-    echo "Installing Xcode Command Line Tools..."
-    xcode-select --install
-    echo "After Xcode Command Line Tools installation completes, please run this script again."
-    exit 1
-fi
+# Function to manage models
+manage_models() {
+    while true; do
+        clear
+        echo "=== LocalGPT Model Management ==="
+        echo "1. List installed models"
+        echo "2. Install new models"
+        echo "3. Remove models"
+        echo "4. Update existing models"
+        echo "5. Check for new models"
+        echo "6. Start LocalGPT"
+        echo "7. Exit"
+        echo ""
+        read -p "Select an option (1-7): " choice
 
-# Check for Homebrew
-if ! command_exists brew; then
-    echo "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
-
-# Check for Ollama
-if ! command_exists ollama; then
-    echo "Installing Ollama..."
-    brew install ollama
-    brew services start ollama
-fi
-
-# Check for Python
-if ! command_exists python3; then
-    echo "Installing Python..."
-    brew install python@3.11
-fi
-
-# Check for pip
-if ! command_exists pip3; then
-    echo "Installing pip..."
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    python3 get-pip.py
-    rm get-pip.py
-fi
-
-# Setup virtual environment
-if [ ! -d "venv" ]; then
-    echo "Setting up Python virtual environment..."
-    python3 -m venv venv
-fi
-
-# Function to check and pull models
-check_and_pull_model() {
-    local model=$1
-    if ! ollama list | grep -q "$model"; then
-        echo "Downloading $model model (this may take a few minutes)..."
-        ollama pull $model
-    else
-        echo "$model model already installed"
-    fi
+        case $choice in
+            1)
+                echo "Installed models:"
+                ollama list
+                read -p "Press Enter to continue..."
+                ;;
+            2)
+                python3 -c '
+import json
+with open("models.json") as f:
+    models = json.load(f)
+print("\\nAvailable models:\\n")
+for category, model_group in models.items():
+    print(f"=== {category.title()} ===")
+    for model, details in model_group.items():
+        print(f"{model} ({details[\"size\"]}): {details[\"description\"]}")
+'
+                read -p "Enter model name to install (or Enter to cancel): " model
+                if [ ! -z "$model" ]; then
+                    check_and_pull_model "$model"
+                fi
+                ;;
+            3)
+                echo "Select model to remove:"
+                ollama list
+                read -p "Enter model name to remove (or Enter to cancel): " model
+                if [ ! -z "$model" ]; then
+                    ollama rm "$model"
+                fi
+                ;;
+            4)
+                echo "Updating installed models..."
+                ollama list | while read model rest; do
+                    if [ ! -z "$model" ]; then
+                        echo "Updating $model..."
+                        ollama pull "$model"
+                    fi
+                done
+                read -p "Press Enter to continue..."
+                ;;
+            5)
+                fetch_latest_models
+                read -p "Press Enter to continue..."
+                ;;
+            6)
+                return
+                ;;
+            7)
+                exit 0
+                ;;
+            *)
+                echo "Invalid option"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # Start Ollama service if not running
 if ! pgrep -x "ollama" > /dev/null; then
     echo "Starting Ollama service..."
     brew services start ollama
-    # Give it a moment to start
     sleep 5
 fi
 
-# Install all required models
-echo "Checking and installing required models..."
-check_and_pull_model "mistral"
-check_and_pull_model "llama2"
-check_and_pull_model "codellama"
-check_and_pull_model "neural-chat"
-check_and_pull_model "starling-lm"
-check_and_pull_model "dolphin-phi"
-check_and_pull_model "phi"
+# Show model management interface
+manage_models
 
-# Activate virtual environment
+# Activate virtual environment and run app
 source venv/bin/activate
-
-# Install requirements
-echo "Installing Python dependencies..."
-pip install -r requirements.txt
-
-# Run the app
-echo "Starting LocalGPT..."
 python3 app.py
 ''')
-    
-    # Make launcher executable
-    os.chmod(launcher_path, 0o755)
+
+    # Copy models.json to the installer package
+    shutil.copy('models.json', 'LocalGPT-Installer/')
     
     # Create README
     with open(os.path.join('LocalGPT-Installer', 'README.txt'), 'w') as f:

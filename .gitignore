@@ -8,11 +8,44 @@ build/
 
 # Python
 __pycache__/
-venv/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# OS files
+# Virtual Environment
+venv/
+ENV/
+
+# Project specific
+projects/
+.env
+*.log
+
+# OS specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Local files
 projects.json
